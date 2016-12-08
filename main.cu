@@ -198,7 +198,7 @@ void sgd_kernel(float* X, float * y, float *w, unsigned long long int num_sample
     if(startIndex >= num_samples)
         return;
         
-    printf("thread id %llu, guage %llu\n", s, guage);
+    //printf("thread id %llu, guage %llu\n", s, guage);
     
     for(int epoch=0; epoch<num_iterations; epoch++)
     {
