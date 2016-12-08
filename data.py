@@ -19,7 +19,7 @@ mean = 0
 noise = sigma * np.random.randn(r)
 
 #print "y with noise is"
-#y = y + noise
+y = y + noise
 #print y
 
 
