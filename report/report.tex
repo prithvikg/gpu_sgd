@@ -230,18 +230,39 @@ Formally this can be expressed as shown below.
 The code for this implementation was implemented in both main.cu and in seq.cpp, i.e a gpu and a cpu implementation of the same parallel algorithm. We now compare the performance of both the GPU and the parallel CPU implementations.
 
 
+\section{Experiments}
+
+We evaluate our methods for speed, scalability and convergence speeds on synthetic dataset created for testing purposes.
+
+\subsection{Cluster Setup}
+
+The experiments were conducted on a Linux machine, equipped with a Intel Xeon E5-2660 processor and a nVidia Titan Z GPU. We use 16 processors for our CPU experiments, while we vary the threads used for the GPU experiments based on the problem size.
+
+\subsection{Data}
+
+We generated a synthetic random dataset using Scikit learn`s libraries. We varied the variance of the distribution to create multiple datasets to test the convergence of our implementation.
+
+\subsection{Results}
+
+We evaluate the scaling properties of our algorithm in a series of experiments on our synthetic dataset. We test scenarios where we keep the dataset size constant and vary the number of iterations, and while keeping the iterations constant and varying the problem size. Independent of the number of iterations or the configuration, our GPU implementation was always the faster algorithm, once the memory overhead is overcome.
+
+\includegraphics[scale=0.75]{cpuvgpu.png}
 
 
-\section{Comparison to CPU parallel implementation}
+\subsection{Nvprof}
 
-\section{CPU vs GPU results for this}
+We used nvprof to profile our algorithm for GPU usage and time spent on different API calls. We first analyzed the point at which the GPU utilization is sufficiently large that it outweighs the memory transfer times. The results show that at a fairly small problem size, of a 40 x 5 matrix, the GPU utilization reaches a 99.2 \%. Hence, we could conclude that this problem is sufficiently large to overcome the memory overhead. Our results below illustrate the GPU usage vs iterations for a 10000 x 20 matrix.
 
-\section{Nvprof results}
+\includegraphics[scale=0.75]{utilization.png}
 
-\section{Optimisations such as using other w to}
+\pagebreak
 
+\section{SGD with faster convergence}
 
+While SGD parallelizes the computation the gradient of a single datapoint in a thread, the threads themselves are not sharing any information that could lead to a better convergence for the problem. One approach to improve convergence is to sync the threads once every $k$ batches and average out the weights. However, this method requires a barrier synchronization, which leads to a performance hit. The alternative approach to achieve a similar result is to use some form of asynchronous communication to speed up the convergence. We implement the ASGD algorithm proposed by Keuper and Pfreundt \textbf{cite}.
 
+The ASGD algorithm, at every batch, compares the weights of the same batch in another thread. If they are off by a large margin, there is no update done to the weights. Otherwise, the weights are updated in a similar manner. Our results show that, when the underlying distribution has a large variation that the SGD algorithm doesn't converge well to, the ASGD algorithm provides better results with comparable execution times. We use the root mean square metric to evaluate convergence between the two methods.
 
+\includegraphics[scale=0.75]{sgdvasgd.png}
 
 \end{document}
