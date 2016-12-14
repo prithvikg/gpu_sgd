@@ -8,11 +8,11 @@
 /* To index element (i,j) of a 2D array stored as 1D */
 #define index(i, j, N)  ((i)*(N)) + (j)
 
-#define SAMPLES 50
-#define DIMENSIONALITY 10
-#define THREADS 5
-#define ITERATIONS 50
-#define MINI_BATCH 10
+#define SAMPLES 5000
+#define DIMENSIONALITY 20
+#define THREADS 8
+#define ITERATIONS 500
+#define MINI_BATCH 8
 
 #define STEP_SIZE 0.05
 
@@ -35,7 +35,8 @@ void take_gradient_step(float *X, float *w, float *y,
                         unsigned long long int threadId,
                         unsigned long long int t,
                         unsigned long long int dimensionality,
-                        unsigned long long int num_samples );
+                        unsigned long long int num_samples,
+                        int epoch);
 
 int main()
 {
@@ -47,6 +48,8 @@ int main()
     unsigned long long int rows, cols;
     rows = num_samples;
     cols = dimensionality;
+
+    cudaSetDevice(1);
 
     // Seed RNG
     srand(time(NULL));
@@ -140,7 +143,7 @@ int main()
 
     if (cudaStatus != cudaSuccess)
     {
-        fprintf(stderr, "cudaMemcpy of w to host failed!");
+        fprintf(stderr, "cudaMemcpy of w to host failed! %s", cudaGetErrorString(cudaStatus));
         return -1;
     }
 
@@ -181,8 +184,11 @@ int main()
     free(host_w);
     free(final_w);
 
-    return 0 ;
+    cudaFree(X);
+    cudaFree(w);
+    cudaFree(y);
 
+    return 0;
 }
 
 __global__
@@ -218,7 +224,7 @@ void sgd_kernel(float* X, float * y, float *w,
             unsigned long long int t = startIndex + (times);
             //printf("thread id %llu, t %llu\n", s, t);
             //take a step with gradient on the t^{th} data point in X
-            take_gradient_step(X, w, y, s, t, dimensionality, num_samples);
+            take_gradient_step(X, w, y, s, t, dimensionality, num_samples, (epoch + 1) * times);
         }
     }
 }
@@ -228,7 +234,8 @@ void take_gradient_step(float *X, float *w, float *y,
                         unsigned long long int threadId,
                         unsigned long long int t,
                         unsigned long long int dimensionality,
-                        unsigned long long int num_samples)
+                        unsigned long long int num_samples,
+                        int epoch)
 {
     float xwsum = 0;
     float term1[DIMENSIONALITY], term2[DIMENSIONALITY];
@@ -243,49 +250,62 @@ void take_gradient_step(float *X, float *w, float *y,
         xwsum += X[index(t, i, dimensionality)] * w[index(threadId, i, dimensionality)];
     }
     xwsum -= y[t];
+
+    if (epoch % MINI_BATCH == 0)
+    {   
+        // Build term1 and term 2
+        for (unsigned long long int i = 0; i < dimensionality; i++)
+        {
+            term1[i] = w[index(threadId, i, dimensionality)] - 
+                        STEP_SIZE * (xwsum * X[index(t, i, dimensionality)]);
+        }
+
+        for (unsigned long long int i = 0; i < dimensionality; i++)
+        {
+            term2[i] = w[index(randomNode, i, dimensionality)];
+        }
+
+        // Compute differences
+        for (unsigned long long int i = 0; i < dimensionality; i++)
+        {
+            diff1 += term1[i] - term2[i];
+        }
+
+        for (unsigned long long int i = 0; i < dimensionality; i++)
+        {
+            diff2 += w[index(randomNode, i, dimensionality)] - w[index(threadId, i, dimensionality)];
+        }
+
+        // Compute delta
+        diff1 = diff1 * diff1;
+        diff2 = diff2 * diff2;
+        delta = (diff1 < diff2) ? 1 : 0;
+
+        // Compute [w^i - 1/2(w^i - w^j)] * delta
+        for (unsigned long long int i = 0; i < dimensionality; i++)
+        {
+            temp += w[index(threadId, i, dimensionality)] - 
+                    w[index(threadId, randomNode, dimensionality)];
+        }
+        temp *= delta * 0.5;
+
+        // Update weights
+        for (unsigned long long int i = 0; i < dimensionality; i++)
+        {
+            w[index(threadId, i, dimensionality)] -= 
+                STEP_SIZE * (temp + (xwsum * X[index(t, i, dimensionality)]));
+        }
+    }
+    else
+    {
+        for (unsigned long long int j = 0; j < dimensionality; j++)
+        {
+            w[index(threadId, j, dimensionality)] -= 
+                STEP_SIZE * (xwsum * X[index(t, j, dimensionality)]);
+        }
+    }
+
     
-    // Build term1 and term 2
-    for (unsigned long long int i = 0; i < dimensionality; i++)
-    {
-        term1[i] = w[index(threadId, i, dimensionality)] - 
-                    STEP_SIZE * (xwsum * X[index(t, i, dimensionality)]);
-    }
-
-    for (unsigned long long int i = 0; i < dimensionality; i++)
-    {
-        term2[i] = w[index(randomNode, i, dimensionality)];
-    }
-
-    // Compute differences
-    for (unsigned long long int i = 0; i < dimensionality; i++)
-    {
-        diff1 += term1[i] - term2[i];
-    }
-
-    for (unsigned long long int i = 0; i < dimensionality; i++)
-    {
-        diff2 += w[index(randomNode, i, dimensionality)] - w[index(threadId, i, dimensionality)];
-    }
-
-    // Compute delta
-    diff1 = diff1 * diff1;
-    diff2 = diff2 * diff2;
-    delta = (diff1 < diff2) ? 1 : 0;
-
-    // Compute [w^i - 1/2(w^i - w^j)] * delta
-    for (unsigned long long int i = 0; i < dimensionality; i++)
-    {
-        temp += w[index(threadId, i, dimensionality)] - 
-                w[index(threadId, randomNode, dimensionality)];
-    }
-    temp *= delta * 0.5;
-
-    // Update weights
-    for (unsigned long long int i = 0; i < dimensionality; i++)
-    {
-        w[index(threadId, i, dimensionality)] -= 
-            STEP_SIZE * (temp + (xwsum * X[index(t, i, dimensionality)]));
-    }
 }
 
 int loadCSV(char *fileName, float *matrix, int rows, int cols)

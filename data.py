@@ -2,6 +2,9 @@ import numpy as np
 r = 5000
 c = 20
 
+# r = 50
+# c = 10
+
 x = np.random.uniform(0, 1, (r,c))
 w = np.random.randint(1,high=10,size=c)
 

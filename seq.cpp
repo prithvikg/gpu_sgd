@@ -9,8 +9,8 @@
 /* To index element (i,j) of a 2D array stored as 1D */
 #define index(i, j, N)  ((i)*(N)) + (j)
 
-#define SAMPLES 50
-#define DIMENSIONALITY 10
+#define SAMPLES 1000
+#define DIMENSIONALITY 50
 #define THREADS 5
 #define ITERATIONS 50
 
@@ -189,8 +189,8 @@ void take_gradient_step(float *X, float *w, float *y,
     float stepSize = 0.05;
     for (unsigned long long int j = 0; j < dimensionality; j++)
     {
-        printf("thread id %llu, f %f, s %f\n", 
-            threadId, X[index(t, j, dimensionality)], w[index(threadId, j, dimensionality)]);
+        // printf("thread id %llu, f %f, s %f\n", 
+        //     threadId, X[index(t, j, dimensionality)], w[index(threadId, j, dimensionality)]);
 
         xwsum += X[index(t, j, dimensionality)] * w[index(threadId, j, dimensionality)];
     }

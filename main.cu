@@ -8,6 +8,11 @@
 /* To index element (i,j) of a 2D array stored as 1D */
 #define index(i, j, N)  ((i)*(N)) + (j)
 
+#define SAMPLES 5000
+#define DIMENSIONALITY 20
+#define THREADS 8
+#define ITERATIONS 500
+
 //read a csv of input data X, a matrix and store it
 //implement function to calculate the gradient of of w wrt one datapoint
 //implement update step
@@ -32,21 +37,23 @@ void take_gradient_step(float *X, float *w, float *y,
 
 int main()
 {
-    unsigned long long int num_samples = 5000;
-    unsigned long long int dimensionality = 20;
-    int num_threads = 5;
-    int num_iterations = 50;
+    unsigned long long int num_samples = SAMPLES;
+    unsigned long long int dimensionality = DIMENSIONALITY;
+    int num_threads = THREADS;
+    int num_iterations = ITERATIONS;
 
     unsigned long long int rows, cols;
     rows = num_samples;
     cols = dimensionality;
 
+    cudaSetDevice(1);
+
     //allocate the array
     float *mat = (float*)malloc(rows * cols * sizeof(float));
     float *maty = (float*)malloc(rows * sizeof(float));
     
-    int result = loadCSV("./xmatrix.csv", mat, rows, cols);
-    int result2 = loadCSV("./yvector.csv", maty, 1, num_samples);
+    int result = loadCSV((char*)"./xmatrix.csv", mat, rows, cols);
+    int result2 = loadCSV((char*)"./yvector.csv", maty, 1, num_samples);
 
     if (result < 0 || result2 < 0)
     {
@@ -171,8 +178,11 @@ int main()
     free(host_w);
     free(final_w);
 
-    return 0 ;
+    cudaFree(X);
+    cudaFree(w);
+    cudaFree(y);
 
+    return 0;
 }
 
 __global__
